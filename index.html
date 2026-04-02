@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>地価データ検索（横持ちCSV対応）</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        input { padding: 6px; font-size: 16px; }
+        button { padding: 6px 12px; font-size: 16px; }
+        table { border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; }
+        #chartContainer { width: 700px; margin-top: 30px; }
+        .radio-group { margin-top: 10px; }
+    </style>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h2>市区町村 × 種別 で地価データ検索（2015〜2025）</h2>
+
+<label>市区町村名：</label>
+<input type="text" id="cityInput" placeholder="例：東京都千代田区">
+
+<div class="radio-group">
+    <label><input type="radio" name="type" value="住宅地" checked> 住宅地</label>
+    <label><input type="radio" name="type" value="商業地"> 商業地</label>
+    <label><input type="radio" name="type" value="工業地"> 工業地</label>
+</div>
+
+<button onclick="search()">検索</button>
+
+<div id="result"></div>
+
+<div id="chartContainer">
+    <canvas id="myChart"></canvas>
+</div>
+
+<script>
+let chart = null;
+
+async function search() {
+    const city = document.getElementById("cityInput").value.trim();
+    const type = document.querySelector("input[name='type']:checked").value;
+
+    if (!city) {
+        alert("市区町村名を入力してください");
+        return;
+    }
+
+    // CSV 読み込み
+    const response = await fetch("landprice.csv");
+    const csvText = await response.text();
+
+    const lines = csvText.split("\n").map(line => line.trim()).filter(line => line);
+    const header = lines[0].split(","); // 市区町村,種別,2015,2016,...
+
+    const rows = lines.slice(1).map(line => line.split(","));
+
+    // 市区町村 & 種別一致データ
+    const filtered = rows.filter(row =>
+        row[0] === city && row[1] === type
+    );
+
+    const resultDiv = document.getElementById("result");
+
+    if (filtered.length === 0) {
+        resultDiv.innerHTML = `<p>「${city} × ${type}」のデータは見つかりませんでした。</p>`;
+        if (chart) chart.destroy();
+        return;
+    }
+
+    // 表示用テーブル
+    let html = "<table><tr>";
+    header.forEach(h => html += `<th>${h}</th>`);
+    html += "</tr>";
+
+    filtered.forEach(row => {
+        html += "<tr>";
+        row.forEach(col => html += `<td>${col}</td>`);
+        html += "</tr>";
+    });
+    html += "</table>";
+
+    resultDiv.innerHTML = html;
+
+    // グラフ用データ
+    const years = header.slice(2); // 2015〜2025
+    const values = filtered[0].slice(2).map(v => Number(v));
+
+    drawChart(years, values, city, type);
+}
+
+function drawChart(labels, data, city, type) {
+    const ctx = document.getElementById("myChart");
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `${city}（${type}）の地価推移`,
+                data: data,
+                borderColor: "blue",
+                backgroundColor: "rgba(0, 0, 255, 0.2)",
+                borderWidth: 2,
+                tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: false }
+            }
+        }
+    });
+}
+</script>
+
+</body>
+</html>
