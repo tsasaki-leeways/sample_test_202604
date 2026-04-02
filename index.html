@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>CSV Data Graph</title>
+    <!-- グラフ描画用ライブラリ -->
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body>
+
+    <h2>市区町村別データ表示</h2>
+    
+    <!-- 1. 入力を受け付ける（市区町村名を入力） -->
+    <input type="text" id="cityInput" placeholder="例: 千代田区">
+    <button onclick="loadAndDraw()">グラフを表示</button>
+
+    <div style="width: 600px; margin-top: 20px;">
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <script>
+        let myChart = null; // グラフのインスタンス保持用
+
+        async function loadAndDraw() {
+            const targetCity = document.getElementById('cityInput').value;
+            if (!targetCity) return alert("市区町村名を入力してください");
+
+            try {
+                // 2. CSVファイルを読み取る
+                const response = await fetch('sample_data.csv');
+                const csvText = await response.text();
+                
+                // CSVを配列に変換
+                const rows = csvText.split('\n').map(row => row.split(','));
+                
+                // 3. 入力された市区町村でデータをフィルタリング
+                const labels = []; // X軸（月）
+                const dataValues = []; // Y軸（数値）
+
+                rows.forEach((row, index) => {
+                    if (index === 0) return; // ヘッダーをスキップ
+                    const [city, month, value] = row;
+                    
+                    if (city === targetCity) {
+                        labels.push(month + "月");
+                        dataValues.push(Number(value));
+                    }
+                });
+
+                if (dataValues.length === 0) {
+                    alert("該当するデータが見つかりませんでした");
+                    return;
+                }
+
+                // 4. グラフを表示
+                drawGraph(targetCity, labels, dataValues);
+
+            } catch (error) {
+                console.error("エラー:", error);
+                alert("CSVの読み込みに失敗しました。サーバー(Live Server等)経由で開いてください。");
+            }
+        }
+
+        function drawGraph(cityName, labels, data) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+
+            // すでにグラフがある場合は破棄して再作成
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `${cityName} の推移`,
+                        data: data,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                }
+            });
+        }
+    </script>
+</body>
+</html>
